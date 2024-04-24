@@ -3,12 +3,19 @@
 pragma solidity ^0.8.18;
 
 import {Script} from "forge-std/Script.sol";
+import {MockV3Aggregator} from "../test/mock/MockV3Aggregator.sol";
 
-contract Config{
+contract Config is Script{
     struct NetworkConfig{
         address priceFeed;
     }
 
+    // Constants for deploying mock Aggregator
+    uint8 public constant DECIMALS = 8;
+    int256 public constant INITIAL_PRICE = 400e8;
+
+    // This will contain the configuration as per the chain you decide to deploy the contract on
+    // Networks are detected using the chainid
     NetworkConfig public networkConfig;
 
     constructor(){
@@ -16,6 +23,8 @@ contract Config{
             networkConfig = getSepoliaConfig();
         } else if(block.chainid == 1101){
             networkConfig = getPolygonZKConfig();
+        } else {
+            networkConfig = getOrCreateAnvilConfig();
         }
     }
 
@@ -29,5 +38,15 @@ contract Config{
         return polygonZKConfig;
     }
 
-    // function getAnvilConfig() public pure returns (NetworkConfig memory){}
+    function getOrCreateAnvilConfig() public returns (NetworkConfig memory){
+        if(networkConfig.priceFeed != address(0)){
+            return networkConfig;
+        }
+        vm.startBroadcast();
+        MockV3Aggregator mockPriceFeed = new MockV3Aggregator(DECIMALS, INITIAL_PRICE);
+        vm.stopBroadcast();
+
+        NetworkConfig memory anvilConfig = NetworkConfig({ priceFeed: address(mockPriceFeed) });
+        return anvilConfig;
+    }
 }
